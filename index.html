@@ -12,7 +12,7 @@
         <div class="brand-copy">
           <p class="eyebrow">행정초등학교 6학년</p>
           <h1>회식 참여 여부 조사</h1>
-          <p>이메일로 로그인한 뒤, 공지된 회식 일정에 참석 여부를 선택합니다.</p>
+          <p>이메일로 로그인한 뒤, 회식 참석 여부와 전체 참여 현황을 확인합니다.</p>
         </div>
       </section>
 
@@ -89,7 +89,7 @@
 
         <section class="hidden stack" id="adminView">
           <form class="card event-form" id="eventForm">
-            <h3>회식 정보 입력</h3>
+            <h3>회식 정보 수정</h3>
             <label>
               제목
               <input id="eventTitle" placeholder="예: 6학년 1학기 회식" required />
@@ -113,13 +113,13 @@
 
           <section class="card">
             <div class="section-heading">
-              <h3>응답 현황</h3>
+              <h3>전체 참여 현황</h3>
               <button class="ghost-button" id="resetResponses" type="button">
                 응답 초기화
               </button>
             </div>
-            <div class="summary-grid" id="summaryGrid"></div>
-            <div class="response-list" id="responseList"></div>
+            <div class="summary-grid" id="adminSummaryGrid"></div>
+            <div class="response-list" id="adminResponseList"></div>
           </section>
         </section>
 
@@ -155,12 +155,18 @@
           </div>
 
           <div class="card hidden complete-card" id="completeStep">
-            <h3>응답이 저장되었습니다.</h3>
+            <h3>내 응답</h3>
             <p id="completeText"></p>
             <button class="ghost-button" id="editResponse" type="button">
               응답 다시 선택
             </button>
           </div>
+
+          <section class="card">
+            <h3>전체 참여 현황</h3>
+            <div class="summary-grid" id="userSummaryGrid"></div>
+            <div class="response-list" id="userResponseList"></div>
+          </section>
         </section>
       </section>
     </main>
