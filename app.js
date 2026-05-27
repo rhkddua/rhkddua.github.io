@@ -19,6 +19,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const firebaseConfig = {
+  // Firebase 콘솔에서 복사한 firebaseConfig 전체를 여기에 붙여 넣으세요.
   apiKey: "여기에_apiKey",
   authDomain: "여기에_authDomain",
   projectId: "여기에_projectId",
@@ -27,12 +28,10 @@ const firebaseConfig = {
   appId: "여기에_appId",
 };
 
-const ADMIN_EMAILS = ["admin@example.com"];
 const GROUPS = ["1반", "2반", "3반", "4반", "5반", "6반", "7반", "영어전담", "과학전담"];
-const EVENT_DOC_ID = "current";
 
 const app = initializeApp(firebaseConfig);
-const firebaseAuth = getAuth(app);
+const auth = getAuth(app);
 const db = getFirestore(app);
 
 const $ = (selector) => document.querySelector(selector);
@@ -45,12 +44,13 @@ const views = {
 };
 
 const state = {
-  user: null,
+  authUser: null,
   profile: null,
   event: null,
   responses: [],
   users: [],
   unsubscribers: [],
+  pendingSignupProfile: null,
 };
 
 const notice = $("#notice");
@@ -86,8 +86,8 @@ function clearSubscriptions() {
   state.unsubscribers = [];
 }
 
-function isAdminUser(user) {
-  return Boolean(user?.email && ADMIN_EMAILS.includes(user.email));
+function isAdmin() {
+  return state.profile?.role === "admin";
 }
 
 function getFirebaseMessage(error) {
@@ -98,6 +98,7 @@ function getFirebaseMessage(error) {
     "auth/weak-password": "비밀번호는 6자리 이상이어야 합니다.",
     "permission-denied": "Firestore 권한을 확인해 주세요.",
   };
+
   return messages[error.code] || "요청을 처리하지 못했습니다. Firebase 설정을 확인해 주세요.";
 }
 
@@ -112,8 +113,15 @@ function formatDate(dateValue) {
   }).format(date);
 }
 
+function sortByGroupAndName(a, b) {
+  return `${a.group || ""}${a.nickname || ""}`.localeCompare(
+    `${b.group || ""}${b.nickname || ""}`,
+    "ko-KR",
+  );
+}
+
 function currentResponse() {
-  return state.responses.find((response) => response.userId === state.user?.uid) || null;
+  return state.responses.find((response) => response.userId === state.authUser?.uid) || null;
 }
 
 function renderEvent() {
@@ -121,7 +129,7 @@ function renderEvent() {
   const details = $("#eventDetails");
 
   if (!state.event) {
-    headline.textContent = "아직 등록된 회식 일정이 없습니다.";
+    headline.textContent = "아직 등록된 회식 정보가 없습니다.";
     details.innerHTML = "";
     $("#attendanceStep").classList.add("hidden");
     $("#drinkStep").classList.add("hidden");
@@ -129,10 +137,11 @@ function renderEvent() {
     return;
   }
 
-  headline.textContent = `${formatDate(state.event.date)} 회식`;
+  headline.textContent = state.event.title || "회식";
   details.innerHTML = `
-    <dt>장소</dt><dd>${state.event.place}</dd>
-    <dt>시간</dt><dd>${state.event.time}</dd>
+    <dt>날짜</dt><dd>${formatDate(state.event.date)}</dd>
+    <dt>시간</dt><dd>${state.event.time || "-"}</dd>
+    <dt>장소</dt><dd>${state.event.place || "-"}</dd>
   `;
   renderUserResponse();
 }
@@ -150,14 +159,15 @@ function renderUserResponse() {
   const drinkText =
     response.attendance === "attend"
       ? response.drink === "yes"
-        ? "음주 버튼을 누르겠다고 선택했습니다."
-        : "음주 버튼을 누르지 않겠다고 선택했습니다."
+        ? "참석, 음주 버튼을 누르겠다고 선택했습니다."
+        : "참석, 음주 버튼을 누르지 않겠다고 선택했습니다."
       : "다음 기회에 참여하겠다고 선택했습니다.";
 
   $("#completeText").textContent = `${response.group} ${response.nickname}님의 응답: ${drinkText}`;
 }
 
 function renderAdmin() {
+  $("#eventTitle").value = state.event?.title || "";
   $("#eventDate").value = state.event?.date || "";
   $("#eventTime").value = state.event?.time || "";
   $("#eventPlace").value = state.event?.place || "";
@@ -172,38 +182,45 @@ function renderAdmin() {
     <div class="summary-item">음주 선택<strong>${drinkCount}</strong></div>
   `;
 
+  const userMap = new Map(state.users.map((user) => [user.id, user]));
+  const responseRows = [...state.responses]
+    .map((response) => ({
+      ...response,
+      user: userMap.get(response.userId) || null,
+    }))
+    .sort((a, b) => sortByGroupAndName(a.user || a, b.user || b));
+
   $("#responseList").innerHTML =
-    [...state.users]
-      .sort((a, b) => `${a.group}${a.nickname}`.localeCompare(`${b.group}${b.nickname}`, "ko-KR"))
-      .map((user) => {
-        const response = state.responses.find((item) => item.userId === user.id);
-        const badgeClass = response
-          ? response.attendance === "attend"
-            ? "attend"
-            : "decline"
-          : "pending";
-        const label = response
-          ? response.attendance === "attend"
+    responseRows
+      .map((response) => {
+        const group = response.group || response.user?.group || "-";
+        const nickname = response.nickname || response.user?.nickname || "알 수 없음";
+        const email = response.email || response.user?.email || "";
+        const label =
+          response.attendance === "attend"
             ? `참석 / 음주 ${response.drink === "yes" ? "누름" : "누르지 않음"}`
-            : "다음 기회에"
-          : "미응답";
+            : "다음 기회에";
+        const badgeClass = response.attendance === "attend" ? "attend" : "decline";
 
         return `
           <div class="response-item">
-            <div><strong>${user.group} ${user.nickname}</strong><span>${user.email}</span></div>
+            <div>
+              <strong>${group} ${nickname}</strong>
+              <span class="response-meta">${email}</span>
+            </div>
             <span class="badge ${badgeClass}">${label}</span>
           </div>
         `;
       })
-      .join("") || `<p class="helper-text">아직 가입한 사용자가 없습니다.</p>`;
+      .join("") || `<p class="helper-text">아직 저장된 응답이 없습니다.</p>`;
 }
 
 function subscribeToEvent() {
   const unsubscribe = onSnapshot(
-    doc(db, "dinners", EVENT_DOC_ID),
+    doc(db, "events", "current"),
     (snapshot) => {
       state.event = snapshot.exists() ? snapshot.data() : null;
-      if (isAdminUser(state.user)) {
+      if (isAdmin()) {
         renderAdmin();
       } else {
         renderEvent();
@@ -216,11 +233,9 @@ function subscribeToEvent() {
 
 function subscribeToCurrentResponse() {
   const unsubscribe = onSnapshot(
-    doc(db, "responses", state.user.uid),
+    doc(db, "responses", state.authUser.uid),
     (snapshot) => {
-      state.responses = snapshot.exists()
-        ? [{ id: snapshot.id, ...snapshot.data() }]
-        : [];
+      state.responses = snapshot.exists() ? [{ id: snapshot.id, ...snapshot.data() }] : [];
       renderUserResponse();
     },
     (error) => showNotice(getFirebaseMessage(error)),
@@ -253,48 +268,73 @@ function subscribeToAdminData() {
 }
 
 async function saveResponse(response) {
-  if (!state.user || !state.profile) return;
+  if (!state.authUser || !state.profile) return;
 
-  await setDoc(doc(db, "responses", state.user.uid), {
-    ...response,
-    dinnerId: EVENT_DOC_ID,
-    userId: state.user.uid,
-    email: state.user.email,
+  const payload = {
+    attendance: response.attendance,
+    eventId: "current",
+    userId: state.authUser.uid,
+    email: state.authUser.email,
     nickname: state.profile.nickname,
     group: state.profile.group,
     submittedAt: serverTimestamp(),
-  });
+  };
+
+  if (response.attendance === "attend") {
+    payload.drink = response.drink;
+  }
+
+  await setDoc(doc(db, "responses", state.authUser.uid), payload);
 }
 
-async function handleSignedInUser(user) {
+async function handleSignedInUser(authUser) {
   clearSubscriptions();
-  state.user = user;
+  state.authUser = authUser;
   state.profile = null;
   state.event = null;
   state.responses = [];
   state.users = [];
 
-  if (isAdminUser(user)) {
-    state.profile = {
-      nickname: "관리자",
-      group: "관리자",
-      role: "admin",
-    };
-    setView("admin", "관리자", "회식 일정 관리");
+  const profileDoc = await getDoc(doc(db, "users", authUser.uid));
+
+  if (!profileDoc.exists()) {
+    if (state.pendingSignupProfile?.email === authUser.email) {
+      await setDoc(doc(db, "users", authUser.uid), {
+        ...state.pendingSignupProfile,
+        role: "user",
+        createdAt: serverTimestamp(),
+      });
+      state.profile = {
+        id: authUser.uid,
+        ...state.pendingSignupProfile,
+        role: "user",
+      };
+      state.pendingSignupProfile = null;
+    } else {
+      await signOut(auth);
+      setView("auth", "시작하기", "로그인 또는 회원가입");
+      showNotice("사용자 정보가 없습니다. 다시 회원가입해 주세요.");
+      return;
+    }
+  } else {
+    state.profile = { id: profileDoc.id, ...profileDoc.data() };
+    state.pendingSignupProfile = null;
+  }
+
+  if (!state.profile) {
+    await signOut(auth);
+    setView("auth", "시작하기", "로그인 또는 회원가입");
+    showNotice("사용자 정보가 없습니다. 다시 회원가입해 주세요.");
+    return;
+  }
+
+  if (isAdmin()) {
+    setView("admin", "관리자", "회식 정보 관리");
     subscribeToEvent();
     subscribeToAdminData();
     return;
   }
 
-  const profileDoc = await getDoc(doc(db, "users", user.uid));
-
-  if (!profileDoc.exists()) {
-    await signOut(firebaseAuth);
-    showNotice("사용자 정보가 없습니다. 다시 회원가입해 주세요.");
-    return;
-  }
-
-  state.profile = profileDoc.data();
   setView("user", state.profile.group, `${state.profile.nickname}님, 참여 여부를 선택해 주세요`);
   subscribeToEvent();
   subscribeToCurrentResponse();
@@ -303,6 +343,7 @@ async function handleSignedInUser(user) {
 $("#signupForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   clearNotice();
+
   const form = event.currentTarget;
   const email = $("#signupEmail").value.trim();
   const password = $("#signupPassword").value;
@@ -316,16 +357,18 @@ $("#signupForm").addEventListener("submit", async (event) => {
 
   setBusy(form, true);
   try {
-    const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+    state.pendingSignupProfile = { email, nickname, group };
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
     await setDoc(doc(db, "users", credential.user.uid), {
       email,
       nickname,
       group,
-      role: "teacher",
+      role: "user",
       createdAt: serverTimestamp(),
     });
     form.reset();
   } catch (error) {
+    state.pendingSignupProfile = null;
     showNotice(getFirebaseMessage(error));
   } finally {
     setBusy(form, false);
@@ -335,13 +378,14 @@ $("#signupForm").addEventListener("submit", async (event) => {
 $("#loginForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   clearNotice();
+
   const form = event.currentTarget;
   const email = $("#loginEmail").value.trim();
   const password = $("#loginPassword").value;
 
   setBusy(form, true);
   try {
-    await signInWithEmailAndPassword(firebaseAuth, email, password);
+    await signInWithEmailAndPassword(auth, email, password);
   } catch (error) {
     showNotice(getFirebaseMessage(error));
   } finally {
@@ -353,23 +397,26 @@ $("#eventForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   clearNotice();
 
-  if (!isAdminUser(state.user)) {
-    showNotice("관리자만 회식 일정을 저장할 수 있습니다.");
+  if (!isAdmin()) {
+    showNotice("관리자만 회식 정보를 저장할 수 있습니다.");
     return;
   }
 
-  await setDoc(doc(db, "dinners", EVENT_DOC_ID), {
+  await setDoc(doc(db, "events", "current"), {
+    title: $("#eventTitle").value.trim(),
     date: $("#eventDate").value,
     time: $("#eventTime").value,
     place: $("#eventPlace").value.trim(),
     updatedAt: serverTimestamp(),
-    updatedBy: state.user.uid,
+    updatedBy: state.authUser.uid,
   });
-  showNotice("회식 일정이 저장되었습니다.");
+  showNotice("회식 정보가 저장되었습니다.");
 });
 
 $("#resetResponses").addEventListener("click", async () => {
-  if (!isAdminUser(state.user)) {
+  clearNotice();
+
+  if (!isAdmin()) {
     showNotice("관리자만 응답을 초기화할 수 있습니다.");
     return;
   }
@@ -382,9 +429,10 @@ $("#resetResponses").addEventListener("click", async () => {
 $$("[data-choice]").forEach((button) => {
   button.addEventListener("click", async () => {
     clearNotice();
+
     try {
       if (button.dataset.choice === "decline") {
-        await saveResponse({ attendance: "decline", drink: "no" });
+        await saveResponse({ attendance: "decline" });
         return;
       }
 
@@ -399,6 +447,7 @@ $$("[data-choice]").forEach((button) => {
 $$("[data-drink]").forEach((button) => {
   button.addEventListener("click", async () => {
     clearNotice();
+
     try {
       await saveResponse({ attendance: "attend", drink: button.dataset.drink });
     } catch (error) {
@@ -409,22 +458,23 @@ $$("[data-drink]").forEach((button) => {
 
 $("#editResponse").addEventListener("click", async () => {
   clearNotice();
+
   try {
-    await deleteDoc(doc(db, "responses", state.user.uid));
+    await deleteDoc(doc(db, "responses", state.authUser.uid));
   } catch (error) {
     showNotice(getFirebaseMessage(error));
   }
 });
 
 logoutButton.addEventListener("click", async () => {
-  await signOut(firebaseAuth);
+  await signOut(auth);
 });
 
-onAuthStateChanged(firebaseAuth, async (user) => {
+onAuthStateChanged(auth, async (authUser) => {
   clearSubscriptions();
 
-  if (!user) {
-    state.user = null;
+  if (!authUser) {
+    state.authUser = null;
     state.profile = null;
     state.event = null;
     state.responses = [];
@@ -434,9 +484,8 @@ onAuthStateChanged(firebaseAuth, async (user) => {
   }
 
   try {
-    await handleSignedInUser(user);
+    await handleSignedInUser(authUser);
   } catch (error) {
     showNotice(getFirebaseMessage(error));
   }
 });
-

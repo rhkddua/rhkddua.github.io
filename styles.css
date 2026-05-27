@@ -277,6 +277,13 @@ select:focus {
   background: #fff;
 }
 
+.response-meta {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .badge {
   border-radius: 999px;
   padding: 6px 10px;
@@ -331,4 +338,3 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
-

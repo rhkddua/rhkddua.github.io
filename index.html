@@ -12,9 +12,7 @@
         <div class="brand-copy">
           <p class="eyebrow">행정초등학교 6학년</p>
           <h1>회식 참여 여부 조사</h1>
-          <p>
-            이메일로 로그인한 뒤, 공지된 회식 일정에 참석 여부를 선택합니다.
-          </p>
+          <p>이메일로 로그인한 뒤, 공지된 회식 일정에 참석 여부를 선택합니다.</p>
         </div>
       </section>
 
@@ -48,9 +46,6 @@
               />
             </label>
             <button class="primary-button" type="submit">로그인</button>
-            <p class="helper-text">
-              관리자 이메일은 app.js 상단의 ADMIN_EMAILS에 입력합니다.
-            </p>
           </form>
 
           <form class="card" id="signupForm">
@@ -94,7 +89,11 @@
 
         <section class="hidden stack" id="adminView">
           <form class="card event-form" id="eventForm">
-            <h3>회식 일정 입력</h3>
+            <h3>회식 정보 입력</h3>
+            <label>
+              제목
+              <input id="eventTitle" placeholder="예: 6학년 1학기 회식" required />
+            </label>
             <div class="form-row">
               <label>
                 날짜
@@ -109,7 +108,7 @@
               장소
               <input id="eventPlace" placeholder="예: 학교 근처 식당" required />
             </label>
-            <button class="primary-button" type="submit">일정 저장</button>
+            <button class="primary-button" type="submit">회식 정보 저장</button>
           </form>
 
           <section class="card">
@@ -126,8 +125,8 @@
 
         <section class="hidden stack" id="userView">
           <div class="card event-card">
-            <p class="page-kicker">현재 회식 일정</p>
-            <h3 id="eventHeadline">아직 등록된 회식 일정이 없습니다.</h3>
+            <p class="page-kicker">현재 회식 정보</p>
+            <h3 id="eventHeadline">아직 등록된 회식 정보가 없습니다.</h3>
             <dl class="event-details" id="eventDetails"></dl>
           </div>
 
@@ -156,7 +155,7 @@
           </div>
 
           <div class="card hidden complete-card" id="completeStep">
-            <h3>조사가 완료되었습니다.</h3>
+            <h3>응답이 저장되었습니다.</h3>
             <p id="completeText"></p>
             <button class="ghost-button" id="editResponse" type="button">
               응답 다시 선택
