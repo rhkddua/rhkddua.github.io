@@ -48,6 +48,7 @@ const state = {
   profile: null,
   event: null,
   responses: [],
+  responsesError: null,
   unsubscribers: [],
   pendingSignupProfile: null,
   isEditingResponse: false,
@@ -122,28 +123,63 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function currentResponse() {
-  return state.responses.find((response) => response.userId === state.authUser?.uid) || null;
+function normalizeAttendance(value) {
+  if (["attend", "attendance", "yes", "join", "참석"].includes(value)) return "attend";
+  if (["decline", "no", "next", "다음 기회", "다음 기회에"].includes(value)) return "decline";
+  return value || "";
+}
+
+function isAttend(response) {
+  return normalizeAttendance(response.attendance) === "attend";
+}
+
+function isDecline(response) {
+  return normalizeAttendance(response.attendance) === "decline";
 }
 
 function attendanceLabel(response) {
-  return response.attendance === "attend" ? "참석" : "다음 기회에";
-}
-
-function drinkLabel(response) {
-  if (response.attendance !== "attend") return "-";
-  if (response.drink === "yes") return "누름";
-  if (response.drink === "no") return "누르지 않음";
+  if (isAttend(response)) return "참석";
+  if (isDecline(response)) return "다음 기회에";
   return "-";
 }
 
+function drinkLabel(response) {
+  if (!isAttend(response)) return "-";
+
+  const drinkValue = response.drink ?? response.alcohol;
+  if (["yes", true, "drink", "누름", "마심"].includes(drinkValue)) return "누름";
+  if (["no", false, "none", "누르지 않음", "안 마심"].includes(drinkValue)) {
+    return "누르지 않음";
+  }
+  return "-";
+}
+
+function getSubmittedTime(response) {
+  const value = response.submittedAt;
+  if (!value) return 0;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.seconds === "number") return value.seconds * 1000;
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 function sortedResponses() {
-  return [...state.responses].sort((a, b) =>
-    `${a.group || ""}${a.nickname || ""}`.localeCompare(
+  return [...state.responses].sort((a, b) => {
+    const timeDiff = getSubmittedTime(b) - getSubmittedTime(a);
+    if (timeDiff) return timeDiff;
+
+    return `${a.group || ""}${a.nickname || ""}`.localeCompare(
       `${b.group || ""}${b.nickname || ""}`,
       "ko-KR",
-    ),
-  );
+    );
+  });
+}
+
+function currentResponse() {
+  return state.responses.find(
+    (response) => response.userId === state.authUser?.uid || response.id === state.authUser?.uid,
+  ) || null;
 }
 
 function renderCurrentScreen() {
@@ -191,10 +227,9 @@ function renderUserResponse() {
 
   if (!response || state.isEditingResponse) return;
 
-  const drinkText =
-    response.attendance === "attend"
-      ? `참석, 음주 여부는 '${drinkLabel(response)}'입니다.`
-      : "다음 기회에 참여하겠다고 선택했습니다.";
+  const drinkText = isAttend(response)
+    ? `참석, 음주 여부는 '${drinkLabel(response)}'입니다.`
+    : "다음 기회에 참여하겠다고 선택했습니다.";
 
   $("#completeText").textContent = `${response.group} ${response.nickname}님의 응답: ${drinkText}`;
 }
@@ -208,22 +243,37 @@ function renderAdmin() {
 }
 
 function renderParticipation(summarySelector, listSelector) {
-  const attendCount = state.responses.filter((item) => item.attendance === "attend").length;
-  const declineCount = state.responses.filter((item) => item.attendance === "decline").length;
-  const drinkCount = state.responses.filter((item) => item.attendance === "attend" && item.drink === "yes").length;
+  const summary = $(summarySelector);
+  const list = $(listSelector);
 
-  $(summarySelector).innerHTML = `
+  if (!summary || !list) return;
+
+  if (state.responsesError) {
+    summary.innerHTML = `
+      <div class="summary-item">참석<strong>-</strong></div>
+      <div class="summary-item">다음 기회에<strong>-</strong></div>
+      <div class="summary-item">음주 선택<strong>-</strong></div>
+    `;
+    list.innerHTML = `<p class="helper-text">참여 현황을 불러오지 못했습니다.</p>`;
+    return;
+  }
+
+  const attendCount = state.responses.filter(isAttend).length;
+  const declineCount = state.responses.filter(isDecline).length;
+  const drinkCount = state.responses.filter((item) => isAttend(item) && drinkLabel(item) === "누름").length;
+
+  summary.innerHTML = `
     <div class="summary-item">참석<strong>${attendCount}</strong></div>
     <div class="summary-item">다음 기회에<strong>${declineCount}</strong></div>
     <div class="summary-item">음주 선택<strong>${drinkCount}</strong></div>
   `;
 
-  $(listSelector).innerHTML =
+  list.innerHTML =
     sortedResponses()
       .map((response) => {
         const label = attendanceLabel(response);
         const drink = drinkLabel(response);
-        const badgeClass = response.attendance === "attend" ? "attend" : "decline";
+        const badgeClass = isAttend(response) ? "attend" : "decline";
         const group = escapeHtml(response.group || "-");
         const nickname = escapeHtml(response.nickname || "이름 없음");
 
@@ -237,7 +287,7 @@ function renderParticipation(summarySelector, listSelector) {
           </div>
         `;
       })
-      .join("") || `<p class="helper-text">아직 저장된 응답이 없습니다.</p>`;
+      .join("") || `<p class="helper-text">아직 응답이 없습니다.</p>`;
 }
 
 function subscribeToEvent() {
@@ -247,7 +297,10 @@ function subscribeToEvent() {
       state.event = snapshot.exists() ? snapshot.data() : null;
       renderCurrentScreen();
     },
-    (error) => showNotice(getFirebaseMessage(error)),
+    (error) => {
+      console.error("[events/current] snapshot error:", error.code, error.message);
+      showNotice(getFirebaseMessage(error));
+    },
   );
   state.unsubscribers.push(unsubscribe);
 }
@@ -256,10 +309,18 @@ function subscribeToResponses() {
   const unsubscribe = onSnapshot(
     collection(db, "responses"),
     (snapshot) => {
+      console.log("[responses] snapshot document count:", snapshot.size);
+      state.responsesError = null;
       state.responses = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
       renderCurrentScreen();
     },
-    (error) => showNotice(getFirebaseMessage(error)),
+    (error) => {
+      console.error("[responses] snapshot error:", error.code, error.message);
+      state.responsesError = error;
+      state.responses = [];
+      renderCurrentScreen();
+      showNotice(getFirebaseMessage(error));
+    },
   );
   state.unsubscribers.push(unsubscribe);
 }
@@ -269,6 +330,7 @@ async function saveResponse(response) {
 
   const payload = {
     attendance: response.attendance,
+    email: state.authUser.email,
     eventId: "current",
     userId: state.authUser.uid,
     nickname: state.profile.nickname,
@@ -291,6 +353,7 @@ async function handleSignedInUser(authUser) {
   state.profile = null;
   state.event = null;
   state.responses = [];
+  state.responsesError = null;
   state.isEditingResponse = false;
 
   const profileDoc = await getDoc(doc(db, "users", authUser.uid));
@@ -411,6 +474,7 @@ $("#resetResponses").addEventListener("click", async () => {
   }
 
   const responsesSnapshot = await getDocs(collection(db, "responses"));
+  console.log("[responses] reset target document count:", responsesSnapshot.size);
   await Promise.all(responsesSnapshot.docs.map((item) => deleteDoc(doc(db, "responses", item.id))));
   showNotice("응답 현황을 초기화했습니다.");
 });
@@ -464,6 +528,7 @@ onAuthStateChanged(auth, async (authUser) => {
     state.profile = null;
     state.event = null;
     state.responses = [];
+    state.responsesError = null;
     state.isEditingResponse = false;
     setView("auth", "시작하기", "로그인 또는 회원가입");
     return;
