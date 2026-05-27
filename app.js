@@ -146,11 +146,19 @@ function drinkLabel(response) {
   if (!isAttend(response)) return "-";
 
   const drinkValue = response.drink ?? response.alcohol;
-  if (["yes", true, "drink", "누름", "마심"].includes(drinkValue)) return "누름";
-  if (["no", false, "none", "누르지 않음", "안 마심"].includes(drinkValue)) {
-    return "누르지 않음";
+  if ([true, "true", "yes", "drink", "pressed", "누름", "마심"].includes(drinkValue)) {
+    return "누름";
+  }
+  if ([false, "false", "no", "none", "unpressed", "not_pressed", "누르지 않음", "안 누름", "안 마심"].includes(drinkValue)) {
+    return "안 누름";
   }
   return "-";
+}
+
+function drinkIconHtml(response) {
+  return isAttend(response) && drinkLabel(response) === "누름"
+    ? ` <span class="beer-icon" aria-label="음주 버튼 선택">🍺</span>`
+    : "";
 }
 
 function getSubmittedTime(response) {
@@ -227,7 +235,7 @@ function renderUserResponse() {
   if (!response || state.isEditingResponse) return;
 
   const drinkText = isAttend(response)
-    ? `참석, 음주 여부는 '${drinkLabel(response)}'입니다.`
+    ? `참석, 음주 버튼은 '${drinkLabel(response)}'입니다.`
     : "다음 기회에 참여하겠다고 선택했습니다.";
 
   $("#completeText").textContent = `${response.group} ${response.nickname}님의 응답: ${drinkText}`;
@@ -251,7 +259,7 @@ function renderParticipation(summarySelector, listSelector) {
     summary.innerHTML = `
       <div class="summary-item">참석<strong>-</strong></div>
       <div class="summary-item">다음 기회에<strong>-</strong></div>
-      <div class="summary-item">음주 선택<strong>-</strong></div>
+      <div class="summary-item">음주 버튼<strong>-</strong></div>
     `;
     list.innerHTML = `<p class="helper-text">참여 현황을 불러오지 못했습니다.</p>`;
     return;
@@ -264,7 +272,7 @@ function renderParticipation(summarySelector, listSelector) {
   summary.innerHTML = `
     <div class="summary-item">참석<strong>${attendCount}</strong></div>
     <div class="summary-item">다음 기회에<strong>${declineCount}</strong></div>
-    <div class="summary-item">음주 선택<strong>${drinkCount}</strong></div>
+    <div class="summary-item">음주 버튼<strong>${drinkCount}</strong></div>
   `;
 
   list.innerHTML =
@@ -272,6 +280,7 @@ function renderParticipation(summarySelector, listSelector) {
       .map((response) => {
         const label = attendanceLabel(response);
         const drink = drinkLabel(response);
+        const drinkIcon = drinkIconHtml(response);
         const badgeClass = isAttend(response) ? "attend" : "decline";
         const group = escapeHtml(response.group || "-");
         const nickname = escapeHtml(response.nickname || "이름 없음");
@@ -280,7 +289,7 @@ function renderParticipation(summarySelector, listSelector) {
           <div class="response-item">
             <div>
               <strong>${group} ${nickname}</strong>
-              <span class="response-meta">참석 여부: ${label} · 음주 여부: ${drink}</span>
+              <span class="response-meta">참석 여부: ${label} · 음주 버튼: ${drink}${drinkIcon}</span>
             </div>
             <span class="badge ${badgeClass}">${label}</span>
           </div>

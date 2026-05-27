@@ -282,6 +282,15 @@ select:focus {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+  line-height: 1.45;
+}
+
+.beer-icon {
+  display: inline-block;
+  margin-left: 2px;
+  font-size: 0.95em;
+  line-height: 1;
+  vertical-align: -0.08em;
 }
 
 .badge {
