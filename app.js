@@ -20,12 +20,12 @@ import {
 
 const firebaseConfig = {
   // Firebase 콘솔에서 복사한 firebaseConfig 전체를 여기에 붙여 넣으세요.
-  apiKey: "여기에_apiKey",
-  authDomain: "여기에_authDomain",
-  projectId: "여기에_projectId",
-  storageBucket: "여기에_storageBucket",
-  messagingSenderId: "여기에_messagingSenderId",
-  appId: "여기에_appId",
+  apiKey: "AIzaSyDeFXKZuh7WWg-pYByroRNczyuGboA8aiI",
+  authDomain: "hj6-2026.firebaseapp.com",
+  projectId: "hj6-2026",
+  storageBucket: "hj6-2026.firebasestorage.app",
+  messagingSenderId: "1074201806314",
+  appId: "1:1074201806314:web:8a6fafd08197e11919de93",
 };
 
 const GROUPS = ["1반", "2반", "3반", "4반", "5반", "6반", "7반", "영어전담", "과학전담"];
