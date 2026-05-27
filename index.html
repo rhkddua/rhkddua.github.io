@@ -1,1 +1,171 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>행정초 6학년 회식 참여 조사</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="brand-panel" aria-label="회식 참여 조사 안내">
+        <div class="brand-copy">
+          <p class="eyebrow">행정초등학교 6학년</p>
+          <h1>회식 참여 여부 조사</h1>
+          <p>
+            이메일로 로그인한 뒤, 공지된 회식 일정에 참석 여부를 선택합니다.
+          </p>
+        </div>
+      </section>
 
+      <section class="work-panel" aria-live="polite">
+        <div class="topbar">
+          <div>
+            <p class="page-kicker" id="viewKicker">시작하기</p>
+            <h2 id="viewTitle">로그인 또는 회원가입</h2>
+          </div>
+          <button class="ghost-button hidden" id="logoutButton" type="button">
+            로그아웃
+          </button>
+        </div>
+
+        <div class="notice hidden" id="notice"></div>
+
+        <section class="auth-grid" id="authView">
+          <form class="card" id="loginForm">
+            <h3>로그인</h3>
+            <label>
+              이메일
+              <input autocomplete="email" id="loginEmail" required type="email" />
+            </label>
+            <label>
+              비밀번호
+              <input
+                autocomplete="current-password"
+                id="loginPassword"
+                required
+                type="password"
+              />
+            </label>
+            <button class="primary-button" type="submit">로그인</button>
+            <p class="helper-text">
+              관리자 이메일은 app.js 상단의 ADMIN_EMAILS에 입력합니다.
+            </p>
+          </form>
+
+          <form class="card" id="signupForm">
+            <h3>회원가입</h3>
+            <label>
+              이메일
+              <input autocomplete="email" id="signupEmail" required type="email" />
+            </label>
+            <label>
+              비밀번호
+              <input
+                autocomplete="new-password"
+                id="signupPassword"
+                minlength="6"
+                required
+                type="password"
+              />
+            </label>
+            <label>
+              닉네임
+              <input autocomplete="nickname" id="signupNickname" required />
+            </label>
+            <label>
+              소속
+              <select id="signupGroup" required>
+                <option value="">선택하세요</option>
+                <option>1반</option>
+                <option>2반</option>
+                <option>3반</option>
+                <option>4반</option>
+                <option>5반</option>
+                <option>6반</option>
+                <option>7반</option>
+                <option>영어전담</option>
+                <option>과학전담</option>
+              </select>
+            </label>
+            <button class="secondary-button" type="submit">가입하기</button>
+          </form>
+        </section>
+
+        <section class="hidden stack" id="adminView">
+          <form class="card event-form" id="eventForm">
+            <h3>회식 일정 입력</h3>
+            <div class="form-row">
+              <label>
+                날짜
+                <input id="eventDate" required type="date" />
+              </label>
+              <label>
+                시간
+                <input id="eventTime" required type="time" />
+              </label>
+            </div>
+            <label>
+              장소
+              <input id="eventPlace" placeholder="예: 학교 근처 식당" required />
+            </label>
+            <button class="primary-button" type="submit">일정 저장</button>
+          </form>
+
+          <section class="card">
+            <div class="section-heading">
+              <h3>응답 현황</h3>
+              <button class="ghost-button" id="resetResponses" type="button">
+                응답 초기화
+              </button>
+            </div>
+            <div class="summary-grid" id="summaryGrid"></div>
+            <div class="response-list" id="responseList"></div>
+          </section>
+        </section>
+
+        <section class="hidden stack" id="userView">
+          <div class="card event-card">
+            <p class="page-kicker">현재 회식 일정</p>
+            <h3 id="eventHeadline">아직 등록된 회식 일정이 없습니다.</h3>
+            <dl class="event-details" id="eventDetails"></dl>
+          </div>
+
+          <div class="card" id="attendanceStep">
+            <h3>참석하시겠습니까?</h3>
+            <div class="button-row">
+              <button class="primary-button" data-choice="attend" type="button">
+                참석
+              </button>
+              <button class="secondary-button" data-choice="decline" type="button">
+                다음 기회에
+              </button>
+            </div>
+          </div>
+
+          <div class="card hidden" id="drinkStep">
+            <h3>음주 버튼을 누르시겠습니까?</h3>
+            <div class="button-row">
+              <button class="primary-button" data-drink="yes" type="button">
+                누르겠습니다
+              </button>
+              <button class="secondary-button" data-drink="no" type="button">
+                누르지 않겠습니다
+              </button>
+            </div>
+          </div>
+
+          <div class="card hidden complete-card" id="completeStep">
+            <h3>조사가 완료되었습니다.</h3>
+            <p id="completeText"></p>
+            <button class="ghost-button" id="editResponse" type="button">
+              응답 다시 선택
+            </button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
